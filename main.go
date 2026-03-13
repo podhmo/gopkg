@@ -12,6 +12,7 @@ Usage:
   gopkg <command> [flags]
 
 Commands:
+  init      Run go mod init [module-path] and install goimports as a tool
   install   Run go mod tidy (and optionally install dev tools)
   upgrade   Run go get -u ./... (and optionally upgrade dev tools)
   format    Run go tool golang.org/x/tools/cmd/goimports -w ./... (and optionally go fix ./...)
@@ -35,6 +36,8 @@ func main() {
 
 	var err error
 	switch args[0] {
+	case "init":
+		err = cmdInit(args[1:])
 	case "install":
 		err = cmdInstall(args[1:])
 	case "upgrade":
@@ -55,6 +58,16 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func cmdInit(args []string) error {
+	fs := flag.NewFlagSet("init", flag.ExitOnError)
+	fs.Parse(args) //nolint:errcheck // ExitOnError
+	modulePath := ""
+	if fs.NArg() > 0 {
+		modulePath = fs.Arg(0)
+	}
+	return runInit(modulePath)
 }
 
 func cmdInstall(args []string) error {
