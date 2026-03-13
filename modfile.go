@@ -2,9 +2,32 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
 )
+
+// readModuleName reads the module declaration from the go.mod file at modPath
+// and returns the module path (e.g. "github.com/podhmo/gopkg").
+func readModuleName(modPath string) (string, error) {
+	f, err := os.Open(modPath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "module ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "module ")), nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+	return "", fmt.Errorf("module directive not found in %s", modPath)
+}
 
 // readToolDirectives parses the tool directives from a go.mod file at modPath
 // and returns the list of module paths declared with the tool directive.

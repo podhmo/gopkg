@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // run executes a command with the given arguments in dir, wiring stdout/stderr
@@ -78,29 +79,85 @@ func runUpgrade(dev bool) error {
 
 const goimportsTool = "golang.org/x/tools/cmd/goimports"
 
-// runFormat runs `go tool golang.org/x/tools/cmd/goimports -w ./...` and,
+// runFormat runs `go tool golang.org/x/tools/cmd/goimports -w <pkgs>` and,
 // when fix is true, runs `go fix ./...` first.
-func runFormat(fix bool) error {
+// pkgs defaults to []string{"./..."} when empty.
+func runFormat(fix bool, pkgs []string) error {
 	root, err := findProjectRoot()
 	if err != nil {
 		return err
 	}
-	return runFormatFrom(root, fix)
+	return runFormatFrom(root, fix, pkgs)
 }
 
 // runFormatFrom is the testable core of runFormat.
-func runFormatFrom(root string, fix bool) error {
+func runFormatFrom(root string, fix bool, pkgs []string) error {
 	if fix {
 		if err := run(root, "go", "fix", "./..."); err != nil {
 			return err
 		}
 	}
 
-	if err := run(root, "go", "tool", goimportsTool, "-w", "./..."); err != nil {
+	patterns, err := resolveFormatPatterns(root, pkgs)
+	if err != nil {
+		return err
+	}
+
+	args := append([]string{"tool", goimportsTool, "-w"}, patterns...)
+	if err := run(root, "go", args...); err != nil {
 		fmt.Fprintf(os.Stderr, "\nhint: to use gopkg format, add goimports as a tool dependency:\n  go get -tool %s@latest\n", goimportsTool)
 		return err
 	}
 	return nil
+}
+
+// resolveFormatPatterns converts Go package patterns to directory paths that
+// goimports accepts.  Relative patterns (e.g. "./...", "./foo/...") are
+// stripped of their trailing "/..." wildcard and returned as directory paths.
+// Absolute import-path patterns (e.g. "github.com/podhmo/gopkg/foo/...") are
+// stripped of the module prefix and converted to the equivalent relative
+// directory path.  When patterns is empty the project root (".") is returned.
+func resolveFormatPatterns(root string, patterns []string) ([]string, error) {
+	if len(patterns) == 0 {
+		return []string{"."}, nil
+	}
+
+	moduleName, err := readModuleName(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return nil, fmt.Errorf("reading module name: %w", err)
+	}
+
+	resolved := make([]string, len(patterns))
+	for i, p := range patterns {
+		resolved[i] = resolvePattern(p, moduleName)
+	}
+	return resolved, nil
+}
+
+// resolvePattern converts a single package pattern to a directory path that
+// goimports understands.  The trailing "/..." wildcard is stripped because
+// goimports already walks directories recursively.  Import paths that match
+// moduleName are converted to relative paths (e.g.
+// "github.com/foo/bar/pkg/..." → "./pkg").
+func resolvePattern(pattern, moduleName string) string {
+	// Strip the "/..." recursive wildcard – goimports walks directories
+	// recursively by itself, so we only need the root directory.
+	p := strings.TrimSuffix(pattern, "/...")
+
+	// Already a relative path – pass through.
+	if strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") || p == "." {
+		return p
+	}
+	// Exact module root.
+	if p == moduleName {
+		return "."
+	}
+	// Import path that starts with the module root followed by a "/".
+	if strings.HasPrefix(p, moduleName+"/") {
+		return "." + p[len(moduleName):]
+	}
+	// Unrecognised – pass through as-is.
+	return p
 }
 
 // runLint runs `go vet ./...`.

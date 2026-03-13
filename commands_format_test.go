@@ -26,7 +26,7 @@ func TestRunFormatFrom_GoimportsNotATool(t *testing.T) {
 	os.Stderr = w
 	defer func() { os.Stderr = origStderr }()
 
-	formatErr := runFormatFrom(root, false)
+	formatErr := runFormatFrom(root, false, nil)
 
 	w.Close()
 	var buf bytes.Buffer
@@ -44,5 +44,67 @@ func TestRunFormatFrom_GoimportsNotATool(t *testing.T) {
 	}
 	if !strings.Contains(hint, goimportsTool) {
 		t.Errorf("expected hint containing %q in stderr, got: %q", goimportsTool, hint)
+	}
+}
+
+// TestResolvePattern verifies that resolvePattern correctly converts package
+// patterns to goimports-compatible directory paths.
+func TestResolvePattern(t *testing.T) {
+	const mod = "github.com/example/mymod"
+	tests := []struct {
+		pattern string
+		want    string
+	}{
+		// "./..." is normalised to "." (goimports walks recursively).
+		{"./...", "."},
+		// "./foo/..." is normalised to "./foo".
+		{"./foo/...", "./foo"},
+		// Relative paths without "..." pass through unchanged.
+		{"./foo", "./foo"},
+		{"../other", "../other"},
+		// Module root → ".".
+		{mod, "."},
+		// Sub-package with wildcard → relative directory.
+		{mod + "/foo/...", "./foo"},
+		// Sub-package without wildcard → relative directory.
+		{mod + "/pkg", "./pkg"},
+		// Unrecognised import path passes through stripped of "/...".
+		{"github.com/other/pkg/...", "github.com/other/pkg"},
+	}
+	for _, tc := range tests {
+		got := resolvePattern(tc.pattern, mod)
+		if got != tc.want {
+			t.Errorf("resolvePattern(%q, %q) = %q, want %q", tc.pattern, mod, got, tc.want)
+		}
+	}
+}
+
+// TestResolveFormatPatterns_Empty verifies that an empty pattern list defaults
+// to "." (the project root, walked recursively by goimports).
+func TestResolveFormatPatterns_Empty(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/testformat\n\ngo 1.24\n")
+
+	got, err := resolveFormatPatterns(root, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0] != "." {
+		t.Errorf("got %v, want [.]", got)
+	}
+}
+
+// TestResolveFormatPatterns_ImportPath verifies that an absolute import path
+// is converted to a relative directory path.
+func TestResolveFormatPatterns_ImportPath(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "go.mod"), "module github.com/example/mymod\n\ngo 1.24\n")
+
+	got, err := resolveFormatPatterns(root, []string{"github.com/example/mymod/sub/..."})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0] != "./sub" {
+		t.Errorf("got %v, want [./sub]", got)
 	}
 }
