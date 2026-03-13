@@ -243,6 +243,12 @@ func runInit(modulePath string, ci bool) error {
 
 // runInitFrom is the testable core of runInit.
 func runInitFrom(dir, modulePath string, ci bool) error {
+	// If go.mod already exists, the module is already initialised – skip all
+	// work and succeed so that repeated calls (e.g. in CI) are idempotent.
+	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+		return nil
+	}
+
 	if modulePath == "" {
 		var err error
 		modulePath, err = modulePathFromDir(dir)
