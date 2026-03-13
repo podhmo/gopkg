@@ -52,7 +52,7 @@ gopkg lint
 
 ## Requirements
 
-- Go 1.24+
+- Go 1.26+
 - `goimports` on `$PATH` for `gopkg format` (install via `go install golang.org/x/tools/cmd/goimports@latest`)
 
 ## How it works
