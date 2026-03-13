@@ -184,6 +184,34 @@ func TestCIWorkflowContent(t *testing.T) {
 	}
 }
 
+// TestRunInitFrom_GoModAlreadyExists verifies that runInitFrom is idempotent:
+// when go.mod already exists in the target directory the call succeeds without
+// modifying anything.
+func TestRunInitFrom_GoModAlreadyExists(t *testing.T) {
+	root := t.TempDir()
+
+	// Create a minimal go.mod so the module is already initialised.
+	existingContent := "module example.com/existing\n\ngo 1.21\n"
+	modPath := filepath.Join(root, "go.mod")
+	if err := os.WriteFile(modPath, []byte(existingContent), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Running runInitFrom must not return an error.
+	if err := runInitFrom(root, "example.com/shouldbeskipped", false); err != nil {
+		t.Fatalf("runInitFrom returned unexpected error: %v", err)
+	}
+
+	// The original go.mod must be unchanged.
+	data, err := os.ReadFile(modPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if string(data) != existingContent {
+		t.Errorf("go.mod was modified; got:\n%s\nwant:\n%s", data, existingContent)
+	}
+}
+
 // TestRunInitFrom_NoCIWorkflow verifies that ci=false does NOT create
 // .github/workflows/ci.yml.
 func TestRunInitFrom_NoCIWorkflow(t *testing.T) {
