@@ -26,7 +26,7 @@ func TestRunFormatFrom_GoimportsNotATool(t *testing.T) {
 	os.Stderr = w
 	defer func() { os.Stderr = origStderr }()
 
-	formatErr := runFormatFrom(root, false, nil)
+	formatErr := runFormatFrom(root, false, false, nil)
 
 	w.Close()
 	var buf bytes.Buffer
@@ -127,7 +127,7 @@ func TestRunFormatFrom_LocalFlagPassedToGoimports(t *testing.T) {
 
 	// runFormatFrom will fail because goimports is not a tool dependency, but
 	// the run() helper logs the command to stdout before executing it.
-	runFormatFrom(root, false, nil) //nolint:errcheck
+	runFormatFrom(root, false, false, nil) //nolint:errcheck
 
 	w.Close()
 	os.Stdout = origStdout
@@ -142,5 +142,38 @@ func TestRunFormatFrom_LocalFlagPassedToGoimports(t *testing.T) {
 	}
 	if !strings.Contains(output, "example.com/mymod") {
 		t.Errorf("expected module name in logged command, got: %q", output)
+	}
+}
+
+// TestRunFormatFrom_VerboseFlagPassedToGoimports verifies that when verbose is
+// true, runFormatFrom passes -v to goimports in the logged command.
+func TestRunFormatFrom_VerboseFlagPassedToGoimports(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/mymod\n\ngo 1.24\n")
+	writeFile(t, filepath.Join(root, "main.go"), "package main\n\nfunc main() {}\n")
+
+	// Capture stdout to verify the -v flag appears in the logged command.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	origStdout := os.Stdout
+	os.Stdout = w
+	defer func() { os.Stdout = origStdout }()
+
+	// runFormatFrom will fail because goimports is not a tool dependency, but
+	// the run() helper logs the command to stdout before executing it.
+	runFormatFrom(root, false, true, nil) //nolint:errcheck
+
+	w.Close()
+	os.Stdout = origStdout
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("reading stdout: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, " -v") {
+		t.Errorf("expected -v flag in logged command, got: %q", output)
 	}
 }

@@ -62,12 +62,13 @@ func main() {
 
 func cmdInit(args []string) error {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
+	ci := fs.Bool("ci", false, "create .github/workflows/ci.yml for GitHub Actions CI")
 	fs.Parse(args) //nolint:errcheck // ExitOnError
 	modulePath := ""
 	if fs.NArg() > 0 {
 		modulePath = fs.Arg(0)
 	}
-	return runInit(modulePath)
+	return runInit(modulePath, *ci)
 }
 
 func cmdInstall(args []string) error {
@@ -87,8 +88,9 @@ func cmdUpgrade(args []string) error {
 func cmdFormat(args []string) error {
 	fs := flag.NewFlagSet("format", flag.ExitOnError)
 	fix := fs.Bool("fix", false, "run go fix ./... before goimports")
+	verbose := fs.Bool("v", false, "pass -v to goimports for verbose output")
 	fs.Parse(args) //nolint:errcheck // ExitOnError
-	return runFormat(*fix, fs.Args())
+	return runFormat(*fix, *verbose, fs.Args())
 }
 
 func cmdLint(args []string) error {
