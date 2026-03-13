@@ -6,6 +6,33 @@ import (
 	"strings"
 )
 
+// readModuleName parses the module directive from a go.mod file at modPath
+// and returns the module path. It returns an empty string when the directive
+// is absent.
+func readModuleName(modPath string) (string, error) {
+	f, err := os.Open(modPath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		// Strip inline comments.
+		if idx := strings.Index(line, "//"); idx >= 0 {
+			line = strings.TrimSpace(line[:idx])
+		}
+
+		if strings.HasPrefix(line, "module ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "module ")), nil
+		}
+	}
+
+	return "", scanner.Err()
+}
+
 // readToolDirectives parses the tool directives from a go.mod file at modPath
 // and returns the list of module paths declared with the tool directive.
 //

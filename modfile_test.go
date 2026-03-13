@@ -119,3 +119,49 @@ tool (
 		t.Fatalf("expected 3 tools, got %v", tools)
 	}
 }
+
+func TestReadModuleName_Simple(t *testing.T) {
+	dir := t.TempDir()
+	modPath := filepath.Join(dir, "go.mod")
+	writeFile(t, modPath, `module example.com/mymod
+
+go 1.24
+`)
+	name, err := readModuleName(modPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if name != "example.com/mymod" {
+		t.Errorf("expected %q, got %q", "example.com/mymod", name)
+	}
+}
+
+func TestReadModuleName_WithInlineComment(t *testing.T) {
+	dir := t.TempDir()
+	modPath := filepath.Join(dir, "go.mod")
+	writeFile(t, modPath, `module example.com/mymod // some comment
+
+go 1.24
+`)
+	name, err := readModuleName(modPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if name != "example.com/mymod" {
+		t.Errorf("expected %q, got %q", "example.com/mymod", name)
+	}
+}
+
+func TestReadModuleName_NoModuleDirective(t *testing.T) {
+	dir := t.TempDir()
+	modPath := filepath.Join(dir, "go.mod")
+	writeFile(t, modPath, `go 1.24
+`)
+	name, err := readModuleName(modPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if name != "" {
+		t.Errorf("expected empty string, got %q", name)
+	}
+}

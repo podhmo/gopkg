@@ -46,3 +46,39 @@ func TestRunFormatFrom_GoimportsNotATool(t *testing.T) {
 		t.Errorf("expected hint containing %q in stderr, got: %q", goimportsTool, hint)
 	}
 }
+
+// TestRunFormatFrom_LocalFlagPassedToGoimports verifies that runFormatFrom
+// invokes goimports with the -local flag set to the module name from go.mod.
+func TestRunFormatFrom_LocalFlagPassedToGoimports(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/mymod\n\ngo 1.24\n")
+	writeFile(t, filepath.Join(root, "main.go"), "package main\n\nfunc main() {}\n")
+
+	// Capture stdout to verify the -local flag is logged in the command invocation.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	origStdout := os.Stdout
+	os.Stdout = w
+	defer func() { os.Stdout = origStdout }()
+
+	// runFormatFrom will fail because goimports is not a tool dependency, but
+	// the run() helper logs the command to stdout before executing it.
+	runFormatFrom(root, false) //nolint:errcheck
+
+	w.Close()
+	os.Stdout = origStdout
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("reading stdout: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "-local") {
+		t.Errorf("expected -local flag in logged command, got: %q", output)
+	}
+	if !strings.Contains(output, "example.com/mymod") {
+		t.Errorf("expected module name in logged command, got: %q", output)
+	}
+}
