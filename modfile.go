@@ -19,8 +19,8 @@ func readModuleName(modPath string) (string, error) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "module ") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "module ")), nil
+		if after, ok := strings.CutPrefix(line, "module "); ok {
+			return strings.TrimSpace(after), nil
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -70,8 +70,8 @@ func readToolDirectives(modPath string) ([]string, error) {
 			continue
 		}
 
-		if strings.HasPrefix(line, "tool ") {
-			rest := strings.TrimSpace(strings.TrimPrefix(line, "tool "))
+		if after, ok := strings.CutPrefix(line, "tool "); ok {
+			rest := strings.TrimSpace(after)
 			if rest == "(" {
 				inBlock = true
 				continue
