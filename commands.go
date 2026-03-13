@@ -18,6 +18,22 @@ func run(dir string, name string, args ...string) error {
 	return cmd.Run()
 }
 
+// runWithEnv is like run but merges the provided key=value pairs into the
+// current process environment before executing the command.
+func runWithEnv(dir string, env map[string]string, name string, args ...string) error {
+	fmt.Fprintf(os.Stdout, "  → %s %v\n", name, args)
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmdEnv := os.Environ()
+	for k, v := range env {
+		cmdEnv = append(cmdEnv, k+"="+v)
+	}
+	cmd.Env = cmdEnv
+	return cmd.Run()
+}
+
 // runInstall runs `go mod tidy` and, when dev is true, installs every tool
 // listed in the go.mod tool directive.
 func runInstall(dev bool) error {
@@ -113,4 +129,35 @@ func upgradeDevTools(root string) error {
 		}
 	}
 	return nil
+}
+
+// runBuild builds the packages.  When output is empty it uses go install with
+// GOBIN set to <root>/.local/gobin so that the build cache is leveraged.
+// When output is non-empty it uses go build -o <output>.
+func runBuild(output string, pkgs []string) error {
+	root, err := findProjectRoot()
+	if err != nil {
+		return err
+	}
+	return runBuildFrom(root, output, pkgs)
+}
+
+// runBuildFrom is the testable core of runBuild.
+func runBuildFrom(root, output string, pkgs []string) error {
+	if output != "" {
+		goArgs := append([]string{"build", "-o", output}, pkgs...)
+		return run(root, "go", goArgs...)
+	}
+
+	// Use go install with GOBIN pointing at <root>/.local/gobin so the Go
+	// build cache is used (go build -o would bypass it for the final link).
+	gobin := filepath.Join(root, ".local", "gobin")
+	if err := os.MkdirAll(gobin, 0o755); err != nil {
+		return fmt.Errorf("creating GOBIN directory: %w", err)
+	}
+
+	if len(pkgs) == 0 {
+		pkgs = []string{"."}
+	}
+	return runWithEnv(root, map[string]string{"GOBIN": gobin}, "go", append([]string{"install"}, pkgs...)...)
 }
