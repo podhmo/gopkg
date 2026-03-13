@@ -119,3 +119,28 @@ tool (
 		t.Fatalf("expected 3 tools, got %v", tools)
 	}
 }
+
+func TestReadModuleName_Simple(t *testing.T) {
+	dir := t.TempDir()
+	modPath := filepath.Join(dir, "go.mod")
+	writeFile(t, modPath, "module github.com/podhmo/gopkg\n\ngo 1.24\n")
+
+	got, err := readModuleName(modPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "github.com/podhmo/gopkg" {
+		t.Errorf("got %q, want %q", got, "github.com/podhmo/gopkg")
+	}
+}
+
+func TestReadModuleName_Missing(t *testing.T) {
+	dir := t.TempDir()
+	modPath := filepath.Join(dir, "go.mod")
+	writeFile(t, modPath, "go 1.24\n")
+
+	_, err := readModuleName(modPath)
+	if err == nil {
+		t.Fatal("expected error when module directive is missing, got nil")
+	}
+}

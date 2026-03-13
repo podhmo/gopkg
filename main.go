@@ -75,7 +75,7 @@ func cmdFormat(args []string) error {
 	fs := flag.NewFlagSet("format", flag.ExitOnError)
 	fix := fs.Bool("fix", false, "run go fix ./... before goimports")
 	fs.Parse(args) //nolint:errcheck // ExitOnError
-	return runFormat(*fix)
+	return runFormat(*fix, fs.Args())
 }
 
 func cmdLint(args []string) error {
