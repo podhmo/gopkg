@@ -177,6 +177,8 @@ func TestCIWorkflowContent(t *testing.T) {
 		"synchronize",
 		"reopened",
 		`go-version: "1.24.0"`,
+		"actions/checkout@v6",
+		"actions/setup-go@v6",
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("ciWorkflowContent missing %q; content:\n%s", want, content)
