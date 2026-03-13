@@ -22,7 +22,7 @@ gopkg <subcommand> [flags]
 |---------|-------------|
 | `gopkg install [--dev]` | Run `go mod tidy`; with `--dev` also `go install` every tool listed in the `tool` directive |
 | `gopkg upgrade [--dev]` | Run `go get -u ./...`; with `--dev` also upgrade tools from the `tool` directive |
-| `gopkg format [--fix]` | Run `goimports -w ./...`; with `--fix` run `go fix ./...` first |
+| `gopkg format [--fix]` | Run `go tool golang.org/x/tools/cmd/goimports -w ./...`; with `--fix` run `go fix ./...` first |
 | `gopkg lint` | Run `go vet ./...` |
 | `gopkg build [-o output] [packages]` | Build packages; without `-o` installs into `<module-root>/.local/gobin` via `go install` (leverages build cache) |
 
@@ -41,8 +41,11 @@ gopkg upgrade
 # Upgrade dependencies AND dev tools
 gopkg upgrade --dev
 
-# Format code (requires goimports)
+# Format code (requires goimports in go.mod tool directive)
 gopkg format
+
+# Add goimports as a tool dependency first if not already present:
+#   go get -tool golang.org/x/tools/cmd/goimports@latest
 
 # Fix + format
 gopkg format --fix
@@ -62,8 +65,8 @@ gopkg build -o /usr/local/bin/mytool
 
 ## Requirements
 
-- Go 1.26+
-- `goimports` on `$PATH` for `gopkg format` (install via `go install golang.org/x/tools/cmd/goimports@latest`)
+- Go 1.24+
+- `goimports` listed as a tool dependency in `go.mod` for `gopkg format` (add via `go get -tool golang.org/x/tools/cmd/goimports@latest`)
 
 ## How it works
 
