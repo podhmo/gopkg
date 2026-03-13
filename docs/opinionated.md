@@ -12,12 +12,6 @@
 2. **Stop at the first `go.mod` file.**
    The first directory that contains a `go.mod` file is unconditionally treated as the project root. Nested `go.mod` files (e.g. inside a sub-module) are never used.
 
-3. **Treat `.git` without `go.mod` as an error.**
-   If a `.git` directory is found before `go.mod`, the search is aborted and the error `"found .git directory but no go.mod; is this a Go module?"` is returned. This prevents running `gopkg` inside a Git repository that is not a Go module.
-
-4. **Treat reaching the filesystem root as an error.**
-   If the walk reaches the filesystem root without finding `go.mod`, the error `"no go.mod found in directory hierarchy"` is returned.
-
 5. **All commands execute in the project root.**
    Every subcommand runs its underlying Go toolchain commands with `cmd.Dir` set to the discovered root directory.
 
