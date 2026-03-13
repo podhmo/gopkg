@@ -318,6 +318,151 @@ func runBuild(output string, verbose bool, pkgs []string) error {
 	return runBuildFrom(root, output, verbose, pkgs)
 }
 
+// splitAtDashDash splits args at the first "--" separator.
+// Everything before "--" is returned as before; everything after as after.
+// If "--" is not present, all args are returned as before and after is nil.
+func splitAtDashDash(args []string) (before, after []string) {
+	for i, arg := range args {
+		if arg == "--" {
+			return args[:i], args[i+1:]
+		}
+	}
+	return args, nil
+}
+
+// runRun builds pkgs and then executes the resulting binary with runArgs,
+// wiring stdin/stdout/stderr to the current process.
+func runRun(verbose bool, pkgs []string, runArgs []string) error {
+	root, err := findProjectRoot()
+	if err != nil {
+		return err
+	}
+	pwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getwd: %w", err)
+	}
+	return runRunFrom(root, pwd, verbose, pkgs, runArgs)
+}
+
+// runRunFrom is the testable core of runRun.  It builds the packages using the
+// same mechanism as gopkg build (go install into <root>/.local/gobin), then
+// locates the installed binary and executes it with runArgs.  The binary is
+// left in place after execution.  pwd is the working directory for the
+// executed binary.
+func runRunFrom(root, pwd string, verbose bool, pkgs []string, runArgs []string) error {
+	// Build using gopkg build's mechanism: go install → .local/gobin.
+	if err := runBuildFrom(root, "", verbose, pkgs); err != nil {
+		return err
+	}
+
+	binaryName, err := binaryNameForPackage(root, pkgs)
+	if err != nil {
+		return fmt.Errorf("determining binary name: %w", err)
+	}
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+
+	gobin := filepath.Join(root, ".local", "gobin")
+	binPath := filepath.Join(gobin, binaryName)
+
+	fmt.Fprintf(os.Stdout, "  → %s %v\n", binPath, runArgs)
+	cmd := exec.Command(binPath, runArgs...)
+	cmd.Dir = pwd
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
+}
+
+// binaryNameForPackage returns the name of the binary that go install produces
+// for the given package list.  Only the first package is considered; when pkgs
+// is empty "." is assumed.
+//
+// For a relative path like "./cmd/app" the binary name is the last directory
+// component ("app").  For "." the name is derived from the module name stored
+// in go.mod (last "/" element).
+func binaryNameForPackage(root string, pkgs []string) (string, error) {
+	pkg := "."
+	if len(pkgs) > 0 {
+		pkg = pkgs[0]
+	}
+
+	// Relative paths: binary name == last directory component.
+	base := filepath.Base(filepath.Clean(pkg))
+	if base != "." {
+		return base, nil
+	}
+
+	// "." (module root): derive from the module name.
+	moduleName, err := readModuleName(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return "", fmt.Errorf("reading module name: %w", err)
+	}
+	// Module paths use "/" separators; take the last element.
+	parts := strings.Split(moduleName, "/")
+	return parts[len(parts)-1], nil
+}
+
+// runDoc converts any relative-path argument to a full module import path and
+// then delegates to go doc.
+func runDoc(args []string) error {
+	root, err := findProjectRoot()
+	if err != nil {
+		return err
+	}
+	pwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getwd: %w", err)
+	}
+	return runDocFrom(root, pwd, args)
+}
+
+// runDocFrom is the testable core of runDoc.  pwd is the directory from which
+// relative paths are resolved; go doc is invoked from pwd so that bare symbol
+// lookups (no package argument) resolve against the package in that directory.
+func runDocFrom(root, pwd string, args []string) error {
+	moduleName, err := readModuleName(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("reading module name: %w", err)
+	}
+
+	docArgs := make([]string, len(args))
+	for i, arg := range args {
+		docArgs[i] = resolveDocArg(arg, pwd, root, moduleName)
+	}
+	return run(pwd, "go", append([]string{"doc"}, docArgs...)...)
+}
+
+// resolveDocArg converts a single go doc argument to a full import path when
+// it is a relative package path (".", "./foo", "../foo").  The path is resolved
+// against pwd, expressed relative to root, and prefixed with moduleName.
+// Arguments that are flags (starting with "-") or are already absolute import
+// paths are returned unchanged.
+func resolveDocArg(arg, pwd, root, moduleName string) string {
+	if !strings.HasPrefix(arg, "./") && !strings.HasPrefix(arg, "../") && arg != "." {
+		return arg
+	}
+
+	absPath := filepath.Join(pwd, arg)
+
+	relPath, err := filepath.Rel(root, absPath)
+	if err != nil {
+		return arg
+	}
+
+	// If the path escapes the module root, pass through unchanged.
+	if strings.HasPrefix(relPath, "..") {
+		return arg
+	}
+
+	relPath = filepath.ToSlash(relPath)
+	if relPath == "." {
+		return moduleName
+	}
+	return moduleName + "/" + relPath
+}
+
 // runBuildFrom is the testable core of runBuild.
 func runBuildFrom(root, output string, verbose bool, pkgs []string) error {
 	if output != "" {
