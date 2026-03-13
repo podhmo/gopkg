@@ -198,6 +198,56 @@ func upgradeDevTools(root string) error {
 	return nil
 }
 
+// runInit initializes a new Go module in the current working directory.
+// When modulePath is empty the path is inferred from the working directory:
+// if the directory path contains "github.com/" the module path is taken as
+// everything from "github.com/" onwards.
+func runInit(modulePath string) error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getwd: %w", err)
+	}
+	return runInitFrom(dir, modulePath)
+}
+
+// runInitFrom is the testable core of runInit.
+func runInitFrom(dir, modulePath string) error {
+	if modulePath == "" {
+		var err error
+		modulePath, err = modulePathFromDir(dir)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := run(dir, "go", "mod", "init", modulePath); err != nil {
+		return err
+	}
+
+	// Install goimports as a tool dependency so that "gopkg format" works
+	// out of the box.
+	if err := run(dir, "go", "get", "-tool", goimportsTool+"@latest"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// modulePathFromDir infers a Go module path from an absolute directory path.
+// If the path contains "github.com/", the module path is everything from
+// "github.com/" onwards.  Otherwise an error is returned asking the user to
+// supply an explicit module path.
+func modulePathFromDir(dir string) (string, error) {
+	// Normalize to forward slashes for consistent substring search on all OSes.
+	normalized := filepath.ToSlash(dir)
+	const prefix = "github.com/"
+	idx := strings.Index(normalized, prefix)
+	if idx != -1 {
+		return normalized[idx:], nil
+	}
+	return "", fmt.Errorf("cannot infer module path from %q: path does not contain %q; please provide a module path explicitly", dir, prefix)
+}
+
 // runBuild builds the packages.  When output is empty it uses go install with
 // GOBIN set to <root>/.local/gobin so that the build cache is leveraged.
 // When output is non-empty it uses go build -o <output>.
