@@ -67,13 +67,37 @@ func TestRunBuildFrom_WithOutput(t *testing.T) {
 	}
 }
 
-// TestRunBuildFrom_GobinIsAbsolutePath verifies that the GOBIN directory created
-// is an absolute path (required by go install).
+// TestRunBuildFrom_GobinIsAbsolutePath verifies that GOBIN is always set to an
+// absolute path by runBuildFrom, even when root is a relative path.
+// go install rejects relative GOBIN values.
 func TestRunBuildFrom_GobinIsAbsolutePath(t *testing.T) {
-	root := t.TempDir() // t.TempDir always returns an absolute path
-	gobinDir := filepath.Join(root, ".local", "gobin")
+	// Build a minimal module in a temp dir so we can derive a relative root.
+	abs := t.TempDir()
+	writeFile(t, filepath.Join(abs, "go.mod"), "module example.com/testbuild\n\ngo 1.21\n")
+	writeFile(t, filepath.Join(abs, "main.go"), simpleMain)
 
-	if !filepath.IsAbs(gobinDir) {
-		t.Errorf("GOBIN path %q is not absolute", gobinDir)
+	// Change into the temp dir so that "." is a valid relative root.
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(abs); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chdir(orig) }) //nolint:errcheck
+
+	// Pass "." as root – this is a relative path.
+	if err := runBuildFrom(".", "", nil); err != nil {
+		t.Fatalf("runBuildFrom with relative root: %v", err)
+	}
+
+	// The binary must have landed in .local/gobin.
+	gobinDir := filepath.Join(abs, ".local", "gobin")
+	entries, err := os.ReadDir(gobinDir)
+	if err != nil {
+		t.Fatalf("reading .local/gobin: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Error("expected a binary in .local/gobin but the directory is empty")
 	}
 }

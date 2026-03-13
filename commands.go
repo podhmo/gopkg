@@ -151,7 +151,11 @@ func runBuildFrom(root, output string, pkgs []string) error {
 
 	// Use go install with GOBIN pointing at <root>/.local/gobin so the Go
 	// build cache is used (go build -o would bypass it for the final link).
-	gobin := filepath.Join(root, ".local", "gobin")
+	// GOBIN must be an absolute path – go install rejects relative paths.
+	gobin, err := filepath.Abs(filepath.Join(root, ".local", "gobin"))
+	if err != nil {
+		return fmt.Errorf("resolving GOBIN path: %w", err)
+	}
 	if err := os.MkdirAll(gobin, 0o755); err != nil {
 		return fmt.Errorf("creating GOBIN directory: %w", err)
 	}
