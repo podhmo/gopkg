@@ -10,17 +10,9 @@
 
 ## v0.2.0 – Quality of life
 
-- [ ] Colour-coded output / progress messages
-- [ ] `gopkg run <tool> [args]` – run a tool from the `tool` directive without a full install
 - [ ] Config file support (`.gopkg.toml`) for per-project defaults
 - [ ] Shell completion (bash / zsh / fish)
-
-## v0.3.0 – Extended tooling
-
-- [ ] `gopkg check` – run `staticcheck` or other static-analysis tools
-- [ ] `gopkg test` – thin wrapper around `go test ./...` with sensible defaults
 - [ ] `gopkg doc` – open `pkg.go.dev` documentation for a package
-- [ ] Plugin system for community-contributed subcommands
 
 ## Ideas / Backlog
 
