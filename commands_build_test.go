@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -20,7 +23,7 @@ func TestRunBuildFrom_NoOutput(t *testing.T) {
 	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/testbuild\n\ngo 1.21\n")
 	writeFile(t, filepath.Join(root, "main.go"), simpleMain)
 
-	if err := runBuildFrom(root, "", nil); err != nil {
+	if err := runBuildFrom(root, "", false, nil); err != nil {
 		t.Fatalf("runBuildFrom: %v", err)
 	}
 
@@ -53,7 +56,7 @@ func TestRunBuildFrom_WithOutput(t *testing.T) {
 	}
 	outPath := filepath.Join(root, outName)
 
-	if err := runBuildFrom(root, outPath, nil); err != nil {
+	if err := runBuildFrom(root, outPath, false, nil); err != nil {
 		t.Fatalf("runBuildFrom: %v", err)
 	}
 
@@ -87,7 +90,7 @@ func TestRunBuildFrom_GobinIsAbsolutePath(t *testing.T) {
 	t.Cleanup(func() { os.Chdir(orig) }) //nolint:errcheck
 
 	// Pass "." as root – this is a relative path.
-	if err := runBuildFrom(".", "", nil); err != nil {
+	if err := runBuildFrom(".", "", false, nil); err != nil {
 		t.Fatalf("runBuildFrom with relative root: %v", err)
 	}
 
@@ -99,5 +102,34 @@ func TestRunBuildFrom_GobinIsAbsolutePath(t *testing.T) {
 	}
 	if len(entries) == 0 {
 		t.Error("expected a binary in .local/gobin but the directory is empty")
+	}
+}
+
+// TestRunBuildFrom_VerboseFlagPassedToGo verifies that when verbose is true,
+// runBuildFrom passes -v to the underlying go install/build command.
+func TestRunBuildFrom_VerboseFlagPassedToGo(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/testbuild\n\ngo 1.21\n")
+	writeFile(t, filepath.Join(root, "main.go"), simpleMain)
+
+	// Capture stdout to verify -v appears in the logged command invocation.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	origStdout := os.Stdout
+	os.Stdout = w
+
+	runBuildFrom(root, "", true, nil) //nolint:errcheck
+
+	w.Close()
+	os.Stdout = origStdout
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("reading stdout: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), " -v") {
+		t.Errorf("expected -v flag in logged command, got: %q", buf.String())
 	}
 }

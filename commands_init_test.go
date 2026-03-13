@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -54,7 +56,7 @@ func TestModulePathFromDir(t *testing.T) {
 func TestRunInitFrom_ExplicitModulePath(t *testing.T) {
 	root := t.TempDir()
 
-	if err := runInitFrom(root, "example.com/testinit"); err != nil {
+	if err := runInitFrom(root, "example.com/testinit", false); err != nil {
 		t.Fatalf("runInitFrom: %v", err)
 	}
 
@@ -101,7 +103,7 @@ func TestRunInitFrom_InferredModulePath(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 
-	if err := runInitFrom(root, ""); err != nil {
+	if err := runInitFrom(root, "", false); err != nil {
 		t.Fatalf("runInitFrom: %v", err)
 	}
 
@@ -122,8 +124,77 @@ func TestRunInitFrom_InferredModulePath(t *testing.T) {
 func TestRunInitFrom_NoGithubInPath(t *testing.T) {
 	root := t.TempDir()
 
-	err := runInitFrom(root, "")
+	err := runInitFrom(root, "", false)
 	if err == nil {
 		t.Fatal("expected error when directory path has no github.com prefix, got nil")
+	}
+}
+
+// TestRunInitFrom_CI verifies that runInitFrom with ci=true creates
+// .github/workflows/ci.yml containing the current Go version and a
+// pull_request trigger with the expected event types.
+func TestRunInitFrom_CI(t *testing.T) {
+	root := t.TempDir()
+
+	if err := runInitFrom(root, "example.com/testci", true); err != nil {
+		t.Fatalf("runInitFrom: %v", err)
+	}
+
+	workflowPath := filepath.Join(root, ".github", "workflows", "ci.yml")
+	data, err := os.ReadFile(workflowPath)
+	if err != nil {
+		t.Fatalf("expected ci.yml to exist: %v", err)
+	}
+	content := string(data)
+
+	// Must contain the pull_request trigger with the required event types.
+	for _, want := range []string{
+		"pull_request",
+		"opened",
+		"synchronize",
+		"reopened",
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("ci.yml missing %q; content:\n%s", want, content)
+		}
+	}
+
+	// Must contain the current Go version.
+	goVersion := strings.TrimPrefix(runtime.Version(), "go")
+	if !strings.Contains(content, goVersion) {
+		t.Errorf("ci.yml missing go-version %q; content:\n%s", goVersion, content)
+	}
+}
+
+// TestCIWorkflowContent verifies that ciWorkflowContent embeds the provided
+// Go version and includes the expected pull_request event types.
+func TestCIWorkflowContent(t *testing.T) {
+	content := ciWorkflowContent("1.24.0")
+
+	for _, want := range []string{
+		"pull_request",
+		"opened",
+		"synchronize",
+		"reopened",
+		`go-version: "1.24.0"`,
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("ciWorkflowContent missing %q; content:\n%s", want, content)
+		}
+	}
+}
+
+// TestRunInitFrom_NoCIWorkflow verifies that ci=false does NOT create
+// .github/workflows/ci.yml.
+func TestRunInitFrom_NoCIWorkflow(t *testing.T) {
+	root := t.TempDir()
+
+	if err := runInitFrom(root, "example.com/testno", false); err != nil {
+		t.Fatalf("runInitFrom: %v", err)
+	}
+
+	workflowPath := filepath.Join(root, ".github", "workflows", "ci.yml")
+	if _, err := os.Stat(workflowPath); err == nil {
+		t.Fatalf("ci.yml should not exist when ci=false, but it does")
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -82,16 +83,16 @@ const goimportsTool = "golang.org/x/tools/cmd/goimports"
 // runFormat runs `go tool golang.org/x/tools/cmd/goimports -w <pkgs>` and,
 // when fix is true, runs `go fix ./...` first.
 // pkgs defaults to []string{"./..."} when empty.
-func runFormat(fix bool, pkgs []string) error {
+func runFormat(fix, verbose bool, pkgs []string) error {
 	root, err := findProjectRoot()
 	if err != nil {
 		return err
 	}
-	return runFormatFrom(root, fix, pkgs)
+	return runFormatFrom(root, fix, verbose, pkgs)
 }
 
 // runFormatFrom is the testable core of runFormat.
-func runFormatFrom(root string, fix bool, pkgs []string) error {
+func runFormatFrom(root string, fix, verbose bool, pkgs []string) error {
 	if fix {
 		if err := run(root, "go", "fix", "./..."); err != nil {
 			return err
@@ -108,7 +109,11 @@ func runFormatFrom(root string, fix bool, pkgs []string) error {
 		return err
 	}
 
-	args := append([]string{"tool", goimportsTool, "-local", moduleName, "-w"}, patterns...)
+	args := []string{"tool", goimportsTool, "-local", moduleName, "-w"}
+	if verbose {
+		args = append(args, "-v")
+	}
+	args = append(args, patterns...)
 	if err := run(root, "go", args...); err != nil {
 		fmt.Fprintf(os.Stderr, "\nhint: to use gopkg format, add goimports as a tool dependency:\n  go get -tool %s@latest\n", goimportsTool)
 		return err
@@ -203,20 +208,41 @@ func upgradeDevTools(root string) error {
 	return nil
 }
 
+// ciWorkflowContent returns the content of the GitHub Actions CI workflow file
+// for the given Go version (e.g. "1.24.0").
+func ciWorkflowContent(goVersion string) string {
+	return `name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "` + goVersion + `"
+      - run: go test ./...
+`
+}
+
 // runInit initializes a new Go module in the current working directory.
 // When modulePath is empty the path is inferred from the working directory:
 // if the directory path contains "github.com/" the module path is taken as
 // everything from "github.com/" onwards.
-func runInit(modulePath string) error {
+func runInit(modulePath string, ci bool) error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("getwd: %w", err)
 	}
-	return runInitFrom(dir, modulePath)
+	return runInitFrom(dir, modulePath, ci)
 }
 
 // runInitFrom is the testable core of runInit.
-func runInitFrom(dir, modulePath string) error {
+func runInitFrom(dir, modulePath string, ci bool) error {
 	if modulePath == "" {
 		var err error
 		modulePath, err = modulePathFromDir(dir)
@@ -235,6 +261,29 @@ func runInitFrom(dir, modulePath string) error {
 		return err
 	}
 
+	if ci {
+		// runtime.Version() returns e.g. "go1.24" or "go1.24.1"; strip the leading "go".
+		goVersion := strings.TrimPrefix(runtime.Version(), "go")
+		if err := writeCIWorkflow(dir, goVersion); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// writeCIWorkflow creates .github/workflows/ci.yml with a GitHub Actions CI
+// configuration that runs tests on pull_request events.
+func writeCIWorkflow(dir, goVersion string) error {
+	workflowDir := filepath.Join(dir, ".github", "workflows")
+	if err := os.MkdirAll(workflowDir, 0o755); err != nil {
+		return fmt.Errorf("creating workflow directory: %w", err)
+	}
+	workflowPath := filepath.Join(workflowDir, "ci.yml")
+	fmt.Fprintf(os.Stdout, "  → writing %s\n", workflowPath)
+	if err := os.WriteFile(workflowPath, []byte(ciWorkflowContent(goVersion)), 0o644); err != nil {
+		return fmt.Errorf("writing ci.yml: %w", err)
+	}
 	return nil
 }
 
@@ -256,18 +305,23 @@ func modulePathFromDir(dir string) (string, error) {
 // runBuild builds the packages.  When output is empty it uses go install with
 // GOBIN set to <root>/.local/gobin so that the build cache is leveraged.
 // When output is non-empty it uses go build -o <output>.
-func runBuild(output string, pkgs []string) error {
+func runBuild(output string, verbose bool, pkgs []string) error {
 	root, err := findProjectRoot()
 	if err != nil {
 		return err
 	}
-	return runBuildFrom(root, output, pkgs)
+	return runBuildFrom(root, output, verbose, pkgs)
 }
 
 // runBuildFrom is the testable core of runBuild.
-func runBuildFrom(root, output string, pkgs []string) error {
+func runBuildFrom(root, output string, verbose bool, pkgs []string) error {
 	if output != "" {
-		goArgs := append([]string{"build", "-o", output}, pkgs...)
+		goArgs := []string{"build"}
+		if verbose {
+			goArgs = append(goArgs, "-v")
+		}
+		goArgs = append(goArgs, "-o", output)
+		goArgs = append(goArgs, pkgs...)
 		return run(root, "go", goArgs...)
 	}
 
@@ -285,5 +339,10 @@ func runBuildFrom(root, output string, pkgs []string) error {
 	if len(pkgs) == 0 {
 		pkgs = []string{"."}
 	}
-	return runWithEnv(root, map[string]string{"GOBIN": gobin}, "go", append([]string{"install"}, pkgs...)...)
+	installArgs := []string{"install"}
+	if verbose {
+		installArgs = append(installArgs, "-v")
+	}
+	installArgs = append(installArgs, pkgs...)
+	return runWithEnv(root, map[string]string{"GOBIN": gobin}, "go", installArgs...)
 }
