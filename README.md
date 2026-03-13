@@ -25,6 +25,7 @@ gopkg <subcommand> [flags]
 | `gopkg format [--fix]` | Run `go tool golang.org/x/tools/cmd/goimports -w ./...`; with `--fix` run `go fix ./...` first |
 | `gopkg lint` | Run `go vet ./...` |
 | `gopkg build [-o output] [packages]` | Build packages; without `-o` installs into `<module-root>/.local/gobin` via `go install` (leverages build cache) |
+| `gopkg resolve [paths...]` | Resolve relative package paths to full module import paths and print them |
 
 ### Examples
 
@@ -61,6 +62,11 @@ gopkg build ./cmd/mytool
 
 # Build to a specific output path
 gopkg build -o /usr/local/bin/mytool
+
+# Resolve relative paths to full module import paths
+gopkg resolve .
+gopkg resolve ./cmd/mytool
+gopkg resolve . ./cmd/mytool ./internal/util
 ```
 
 ## Requirements
