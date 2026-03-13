@@ -102,6 +102,7 @@ func cmdLint(args []string) error {
 func cmdBuild(args []string) error {
 	fs := flag.NewFlagSet("build", flag.ExitOnError)
 	output := fs.String("o", "", "write the resulting binary to this path (uses go build -o); omit to install into <module-root>/.local/gobin via go install")
+	verbose := fs.Bool("v", false, "pass -v to the underlying go build/install command")
 	fs.Parse(args) //nolint:errcheck // ExitOnError
-	return runBuild(*output, fs.Args())
+	return runBuild(*output, *verbose, fs.Args())
 }

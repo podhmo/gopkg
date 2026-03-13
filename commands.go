@@ -305,18 +305,23 @@ func modulePathFromDir(dir string) (string, error) {
 // runBuild builds the packages.  When output is empty it uses go install with
 // GOBIN set to <root>/.local/gobin so that the build cache is leveraged.
 // When output is non-empty it uses go build -o <output>.
-func runBuild(output string, pkgs []string) error {
+func runBuild(output string, verbose bool, pkgs []string) error {
 	root, err := findProjectRoot()
 	if err != nil {
 		return err
 	}
-	return runBuildFrom(root, output, pkgs)
+	return runBuildFrom(root, output, verbose, pkgs)
 }
 
 // runBuildFrom is the testable core of runBuild.
-func runBuildFrom(root, output string, pkgs []string) error {
+func runBuildFrom(root, output string, verbose bool, pkgs []string) error {
 	if output != "" {
-		goArgs := append([]string{"build", "-o", output}, pkgs...)
+		goArgs := []string{"build"}
+		if verbose {
+			goArgs = append(goArgs, "-v")
+		}
+		goArgs = append(goArgs, "-o", output)
+		goArgs = append(goArgs, pkgs...)
 		return run(root, "go", goArgs...)
 	}
 
@@ -334,5 +339,10 @@ func runBuildFrom(root, output string, pkgs []string) error {
 	if len(pkgs) == 0 {
 		pkgs = []string{"."}
 	}
-	return runWithEnv(root, map[string]string{"GOBIN": gobin}, "go", append([]string{"install"}, pkgs...)...)
+	installArgs := []string{"install"}
+	if verbose {
+		installArgs = append(installArgs, "-v")
+	}
+	installArgs = append(installArgs, pkgs...)
+	return runWithEnv(root, map[string]string{"GOBIN": gobin}, "go", installArgs...)
 }
