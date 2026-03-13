@@ -98,12 +98,17 @@ func runFormatFrom(root string, fix bool, pkgs []string) error {
 		}
 	}
 
+	moduleName, err := readModuleName(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("reading module name: %w", err)
+	}
+
 	patterns, err := resolveFormatPatterns(root, pkgs)
 	if err != nil {
 		return err
 	}
 
-	args := append([]string{"tool", goimportsTool, "-w"}, patterns...)
+	args := append([]string{"tool", goimportsTool, "-local", moduleName, "-w"}, patterns...)
 	if err := run(root, "go", args...); err != nil {
 		fmt.Fprintf(os.Stderr, "\nhint: to use gopkg format, add goimports as a tool dependency:\n  go get -tool %s@latest\n", goimportsTool)
 		return err
