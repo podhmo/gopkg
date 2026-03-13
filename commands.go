@@ -243,6 +243,14 @@ func runInit(modulePath string, ci bool) error {
 
 // runInitFrom is the testable core of runInit.
 func runInitFrom(dir, modulePath string, ci bool) error {
+	if ci {
+		// runtime.Version() returns e.g. "go1.24" or "go1.24.1"; strip the leading "go".
+		goVersion := strings.TrimPrefix(runtime.Version(), "go")
+		if err := writeCIWorkflow(dir, goVersion); err != nil {
+			return err
+		}
+	}
+
 	// If go.mod already exists, the module is already initialised – skip all
 	// work and succeed so that repeated calls (e.g. in CI) are idempotent.
 	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
@@ -266,15 +274,6 @@ func runInitFrom(dir, modulePath string, ci bool) error {
 	if err := run(dir, "go", "get", "-tool", goimportsTool+"@latest"); err != nil {
 		return err
 	}
-
-	if ci {
-		// runtime.Version() returns e.g. "go1.24" or "go1.24.1"; strip the leading "go".
-		goVersion := strings.TrimPrefix(runtime.Version(), "go")
-		if err := writeCIWorkflow(dir, goVersion); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
