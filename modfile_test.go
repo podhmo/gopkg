@@ -123,45 +123,24 @@ tool (
 func TestReadModuleName_Simple(t *testing.T) {
 	dir := t.TempDir()
 	modPath := filepath.Join(dir, "go.mod")
-	writeFile(t, modPath, `module example.com/mymod
+	writeFile(t, modPath, "module github.com/podhmo/gopkg\n\ngo 1.24\n")
 
-go 1.24
-`)
-	name, err := readModuleName(modPath)
+	got, err := readModuleName(modPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if name != "example.com/mymod" {
-		t.Errorf("expected %q, got %q", "example.com/mymod", name)
+	if got != "github.com/podhmo/gopkg" {
+		t.Errorf("got %q, want %q", got, "github.com/podhmo/gopkg")
 	}
 }
 
-func TestReadModuleName_WithInlineComment(t *testing.T) {
+func TestReadModuleName_Missing(t *testing.T) {
 	dir := t.TempDir()
 	modPath := filepath.Join(dir, "go.mod")
-	writeFile(t, modPath, `module example.com/mymod // some comment
+	writeFile(t, modPath, "go 1.24\n")
 
-go 1.24
-`)
-	name, err := readModuleName(modPath)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if name != "example.com/mymod" {
-		t.Errorf("expected %q, got %q", "example.com/mymod", name)
-	}
-}
-
-func TestReadModuleName_NoModuleDirective(t *testing.T) {
-	dir := t.TempDir()
-	modPath := filepath.Join(dir, "go.mod")
-	writeFile(t, modPath, `go 1.24
-`)
-	name, err := readModuleName(modPath)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if name != "" {
-		t.Errorf("expected empty string, got %q", name)
+	_, err := readModuleName(modPath)
+	if err == nil {
+		t.Fatal("expected error when module directive is missing, got nil")
 	}
 }

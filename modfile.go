@@ -2,13 +2,13 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
 )
 
-// readModuleName parses the module directive from a go.mod file at modPath
-// and returns the module path. It returns an empty string when the directive
-// is absent.
+// readModuleName reads the module declaration from the go.mod file at modPath
+// and returns the module path (e.g. "github.com/podhmo/gopkg").
 func readModuleName(modPath string) (string, error) {
 	f, err := os.Open(modPath)
 	if err != nil {
@@ -19,18 +19,14 @@ func readModuleName(modPath string) (string, error) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-
-		// Strip inline comments.
-		if idx := strings.Index(line, "//"); idx >= 0 {
-			line = strings.TrimSpace(line[:idx])
-		}
-
-		if strings.HasPrefix(line, "module ") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "module ")), nil
+		if after, ok := strings.CutPrefix(line, "module "); ok {
+			return strings.TrimSpace(after), nil
 		}
 	}
-
-	return "", scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+	return "", fmt.Errorf("module directive not found in %s", modPath)
 }
 
 // readToolDirectives parses the tool directives from a go.mod file at modPath
@@ -74,8 +70,8 @@ func readToolDirectives(modPath string) ([]string, error) {
 			continue
 		}
 
-		if strings.HasPrefix(line, "tool ") {
-			rest := strings.TrimSpace(strings.TrimPrefix(line, "tool "))
+		if after, ok := strings.CutPrefix(line, "tool "); ok {
+			rest := strings.TrimSpace(after)
 			if rest == "(" {
 				inBlock = true
 				continue
