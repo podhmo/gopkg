@@ -76,21 +76,31 @@ func runUpgrade(dev bool) error {
 	return nil
 }
 
-// runFormat runs `goimports -w ./...` and, when fix is true, runs `go fix
-// ./...` first.
+const goimportsTool = "golang.org/x/tools/cmd/goimports"
+
+// runFormat runs `go tool golang.org/x/tools/cmd/goimports -w ./...` and,
+// when fix is true, runs `go fix ./...` first.
 func runFormat(fix bool) error {
 	root, err := findProjectRoot()
 	if err != nil {
 		return err
 	}
+	return runFormatFrom(root, fix)
+}
 
+// runFormatFrom is the testable core of runFormat.
+func runFormatFrom(root string, fix bool) error {
 	if fix {
 		if err := run(root, "go", "fix", "./..."); err != nil {
 			return err
 		}
 	}
 
-	return run(root, "goimports", "-w", "./...")
+	if err := run(root, "go", "tool", goimportsTool, "-w", "./..."); err != nil {
+		fmt.Fprintf(os.Stderr, "\nhint: to use gopkg format, add goimports as a tool dependency:\n  go get -tool %s@latest\n", goimportsTool)
+		return err
+	}
+	return nil
 }
 
 // runLint runs `go vet ./...`.

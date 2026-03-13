@@ -14,7 +14,7 @@ Usage:
 Commands:
   install   Run go mod tidy (and optionally install dev tools)
   upgrade   Run go get -u ./... (and optionally upgrade dev tools)
-  format    Run goimports -w ./... (and optionally go fix ./...)
+  format    Run go tool golang.org/x/tools/cmd/goimports -w ./... (and optionally go fix ./...)
   lint      Run go vet ./...
   build     Build packages (go install into .local/gobin, or go build -o)
 
