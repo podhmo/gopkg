@@ -16,6 +16,7 @@ Commands:
   upgrade   Run go get -u ./... (and optionally upgrade dev tools)
   format    Run goimports -w ./... (and optionally go fix ./...)
   lint      Run go vet ./...
+  build     Build packages (go install into .local/gobin, or go build -o)
 
 Run 'gopkg <command> -help' for per-command flags.
 `
@@ -42,6 +43,8 @@ func main() {
 		err = cmdFormat(args[1:])
 	case "lint":
 		err = cmdLint(args[1:])
+	case "build":
+		err = cmdBuild(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", args[0])
 		flag.Usage()
@@ -79,4 +82,11 @@ func cmdLint(args []string) error {
 	fs := flag.NewFlagSet("lint", flag.ExitOnError)
 	fs.Parse(args) //nolint:errcheck // ExitOnError
 	return runLint()
+}
+
+func cmdBuild(args []string) error {
+	fs := flag.NewFlagSet("build", flag.ExitOnError)
+	output := fs.String("o", "", "write the resulting binary to this path (uses go build -o); omit to install into <module-root>/.local/gobin via go install")
+	fs.Parse(args) //nolint:errcheck // ExitOnError
+	return runBuild(*output, fs.Args())
 }

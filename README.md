@@ -24,6 +24,7 @@ gopkg <subcommand> [flags]
 | `gopkg upgrade [--dev]` | Run `go get -u ./...`; with `--dev` also upgrade tools from the `tool` directive |
 | `gopkg format [--fix]` | Run `goimports -w ./...`; with `--fix` run `go fix ./...` first |
 | `gopkg lint` | Run `go vet ./...` |
+| `gopkg build [-o output] [packages]` | Build packages; without `-o` installs into `<module-root>/.local/gobin` via `go install` (leverages build cache) |
 
 ### Examples
 
@@ -48,6 +49,15 @@ gopkg format --fix
 
 # Lint
 gopkg lint
+
+# Build the current package (installs binary into .local/gobin/)
+gopkg build
+
+# Build specific packages
+gopkg build ./cmd/mytool
+
+# Build to a specific output path
+gopkg build -o /usr/local/bin/mytool
 ```
 
 ## Requirements
