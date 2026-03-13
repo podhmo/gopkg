@@ -344,33 +344,64 @@ func runRun(verbose bool, pkgs []string, runArgs []string) error {
 	return runRunFrom(root, pwd, verbose, pkgs, runArgs)
 }
 
-// runRunFrom is the testable core of runRun.  It builds the packages to a
-// temporary directory using go build -o and then executes the resulting binary
-// with runArgs.  pwd is the working directory for the executed binary.
+// runRunFrom is the testable core of runRun.  It builds the packages using the
+// same mechanism as gopkg build (go install into <root>/.local/gobin), then
+// locates the installed binary and executes it with runArgs.  The binary is
+// left in place after execution.  pwd is the working directory for the
+// executed binary.
 func runRunFrom(root, pwd string, verbose bool, pkgs []string, runArgs []string) error {
-	tmpDir, err := os.MkdirTemp("", "gopkg-run-*")
-	if err != nil {
-		return fmt.Errorf("creating temp dir: %w", err)
-	}
-	defer os.RemoveAll(tmpDir) //nolint:errcheck
-
-	binaryName := "bin"
-	if runtime.GOOS == "windows" {
-		binaryName += ".exe"
-	}
-	outPath := filepath.Join(tmpDir, binaryName)
-
-	if err := runBuildFrom(root, outPath, verbose, pkgs); err != nil {
+	// Build using gopkg build's mechanism: go install → .local/gobin.
+	if err := runBuildFrom(root, "", verbose, pkgs); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(os.Stdout, "  → %s %v\n", outPath, runArgs)
-	cmd := exec.Command(outPath, runArgs...)
+	binaryName, err := binaryNameForPackage(root, pkgs)
+	if err != nil {
+		return fmt.Errorf("determining binary name: %w", err)
+	}
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+
+	gobin := filepath.Join(root, ".local", "gobin")
+	binPath := filepath.Join(gobin, binaryName)
+
+	fmt.Fprintf(os.Stdout, "  → %s %v\n", binPath, runArgs)
+	cmd := exec.Command(binPath, runArgs...)
 	cmd.Dir = pwd
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	return cmd.Run()
+}
+
+// binaryNameForPackage returns the name of the binary that go install produces
+// for the given package list.  Only the first package is considered; when pkgs
+// is empty "." is assumed.
+//
+// For a relative path like "./cmd/app" the binary name is the last directory
+// component ("app").  For "." the name is derived from the module name stored
+// in go.mod (last "/" element).
+func binaryNameForPackage(root string, pkgs []string) (string, error) {
+	pkg := "."
+	if len(pkgs) > 0 {
+		pkg = pkgs[0]
+	}
+
+	// Relative paths: binary name == last directory component.
+	base := filepath.Base(filepath.Clean(pkg))
+	if base != "." {
+		return base, nil
+	}
+
+	// "." (module root): derive from the module name.
+	moduleName, err := readModuleName(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return "", fmt.Errorf("reading module name: %w", err)
+	}
+	// Module paths use "/" separators; take the last element.
+	parts := strings.Split(moduleName, "/")
+	return parts[len(parts)-1], nil
 }
 
 // runDoc converts any relative-path argument to a full module import path and

@@ -91,7 +91,39 @@ func TestSplitAtDashDash(t *testing.T) {
 	}
 }
 
-// TestRunRunFrom_NoArgs verifies that runRunFrom builds and runs the binary.
+// TestBinaryNameForPackage verifies the binary name derivation logic.
+// No filesystem access is required for non-"." package arguments; only "."
+// needs the go.mod to read the module name.
+func TestBinaryNameForPackage(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "go.mod"), "module github.com/example/mymod\n\ngo 1.21\n")
+
+	tests := []struct {
+		pkgs []string
+		want string
+	}{
+		// nil / empty → derive from module name last element
+		{nil, "mymod"},
+		{[]string{"."}, "mymod"},
+		// explicit relative paths
+		{[]string{"./cmd/app"}, "app"},
+		{[]string{"./tool"}, "tool"},
+	}
+
+	for _, tt := range tests {
+		got, err := binaryNameForPackage(root, tt.pkgs)
+		if err != nil {
+			t.Errorf("binaryNameForPackage(%v): %v", tt.pkgs, err)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("binaryNameForPackage(%v) = %q, want %q", tt.pkgs, got, tt.want)
+		}
+	}
+}
+
+// TestRunRunFrom_NoArgs verifies that runRunFrom builds, runs, and leaves the
+// binary in .local/gobin.
 func TestRunRunFrom_NoArgs(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/testrun\n\ngo 1.21\n")
@@ -99,6 +131,16 @@ func TestRunRunFrom_NoArgs(t *testing.T) {
 
 	if err := runRunFrom(root, root, false, nil, nil); err != nil {
 		t.Fatalf("runRunFrom: %v", err)
+	}
+
+	// The binary must remain in .local/gobin after the run.
+	gobinDir := filepath.Join(root, ".local", "gobin")
+	entries, err := os.ReadDir(gobinDir)
+	if err != nil {
+		t.Fatalf("reading .local/gobin: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected binary to remain in .local/gobin after run, but directory is empty")
 	}
 }
 
@@ -137,7 +179,7 @@ func TestRunRunFrom_WithRunArgs(t *testing.T) {
 }
 
 // TestRunRunFrom_VerboseFlagPassedToGo verifies that -v is forwarded to the
-// underlying go build command.
+// underlying go install command.
 func TestRunRunFrom_VerboseFlagPassedToGo(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/testrun\n\ngo 1.21\n")
@@ -165,7 +207,7 @@ func TestRunRunFrom_VerboseFlagPassedToGo(t *testing.T) {
 }
 
 // TestRunRunFrom_ExplicitPackage verifies that an explicit package path is
-// forwarded to go build.
+// built to .local/gobin and the binary is then executed.
 func TestRunRunFrom_ExplicitPackage(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/testrun\n\ngo 1.21\n")
@@ -178,4 +220,11 @@ func TestRunRunFrom_ExplicitPackage(t *testing.T) {
 	if err := runRunFrom(root, root, false, []string{"./cmd/hello"}, nil); err != nil {
 		t.Fatalf("runRunFrom with explicit package: %v", err)
 	}
+
+	// Binary must remain in .local/gobin.
+	binPath := filepath.Join(root, ".local", "gobin", "hello")
+	if _, err := os.Stat(binPath); err != nil {
+		t.Errorf("expected binary at %s after run: %v", binPath, err)
+	}
 }
+
