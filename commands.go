@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -404,9 +405,9 @@ func binaryNameForPackage(root string, pkgs []string) (string, error) {
 	return parts[len(parts)-1], nil
 }
 
-// runDoc converts any relative-path argument to a full module import path and
-// then delegates to go doc.
-func runDoc(args []string) error {
+// runResolve converts any relative-path argument to a full module import path
+// and prints each resolved path to stdout.
+func runResolve(args []string) error {
 	root, err := findProjectRoot()
 	if err != nil {
 		return err
@@ -415,23 +416,24 @@ func runDoc(args []string) error {
 	if err != nil {
 		return fmt.Errorf("getwd: %w", err)
 	}
-	return runDocFrom(root, pwd, args)
+	return runResolveFrom(os.Stdout, root, pwd, args)
 }
 
-// runDocFrom is the testable core of runDoc.  pwd is the directory from which
-// relative paths are resolved; go doc is invoked from pwd so that bare symbol
-// lookups (no package argument) resolve against the package in that directory.
-func runDocFrom(root, pwd string, args []string) error {
+// runResolveFrom is the testable core of runResolve. It resolves each argument
+// to a full module import path and writes one result per line to out.
+// Arguments that are flags (starting with "-") or already absolute import paths
+// are written unchanged.
+func runResolveFrom(out io.Writer, root, pwd string, args []string) error {
 	moduleName, err := readModuleName(filepath.Join(root, "go.mod"))
 	if err != nil {
 		return fmt.Errorf("reading module name: %w", err)
 	}
 
-	docArgs := make([]string, len(args))
-	for i, arg := range args {
-		docArgs[i] = resolveDocArg(arg, pwd, root, moduleName)
+	for _, arg := range args {
+		resolved := resolveDocArg(arg, pwd, root, moduleName)
+		fmt.Fprintln(out, resolved)
 	}
-	return run(pwd, "go", append([]string{"doc"}, docArgs...)...)
+	return nil
 }
 
 // resolveDocArg converts a single go doc argument to a full import path when

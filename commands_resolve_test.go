@@ -1,8 +1,9 @@
 package main
 
 import (
-	"os"
+	"bytes"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -85,50 +86,48 @@ func TestResolveDocArg_OutsideModule(t *testing.T) {
 	}
 }
 
-// TestRunDocFrom verifies that runDocFrom invokes go doc with the converted
-// import path when given a relative path argument.
-func TestRunDocFrom(t *testing.T) {
+// TestRunResolveFrom verifies that runResolveFrom writes the resolved import
+// path to the writer when given a relative path argument.
+func TestRunResolveFrom(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/testdoc\n\ngo 1.21\n")
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/testmod\n\ngo 1.21\n")
 
-	// Create a sub-package with an exported symbol so that go doc has something
-	// to show.
-	subDir := filepath.Join(root, "greet")
-	if err := os.MkdirAll(subDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
+	var buf bytes.Buffer
+	if err := runResolveFrom(&buf, root, root, []string{"./greet"}); err != nil {
+		t.Fatalf("runResolveFrom: %v", err)
 	}
-	writeFile(t, filepath.Join(subDir, "greet.go"), `// Package greet says hello.
-package greet
 
-// Hello returns a greeting.
-func Hello() string { return "hello" }
-`)
-
-	// Run gopkg doc ./greet from the module root; the relative path should be
-	// resolved to example.com/testdoc/greet.
-	if err := runDocFrom(root, root, []string{"./greet"}); err != nil {
-		t.Fatalf("runDocFrom: %v", err)
+	got := strings.TrimSpace(buf.String())
+	want := "example.com/testmod/greet"
+	if got != want {
+		t.Errorf("runResolveFrom output = %q, want %q", got, want)
 	}
 }
 
-// TestRunDocFrom_WithFlag verifies that flags such as -all are forwarded to
-// go doc unchanged.
-func TestRunDocFrom_WithFlag(t *testing.T) {
+// TestRunResolveFrom_MultipleArgs verifies that runResolveFrom writes one
+// resolved path per line for multiple arguments.
+func TestRunResolveFrom_MultipleArgs(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/testdoc\n\ngo 1.21\n")
-	subDir := filepath.Join(root, "greet")
-	if err := os.MkdirAll(subDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
+	writeFile(t, filepath.Join(root, "go.mod"), "module example.com/testmod\n\ngo 1.21\n")
+
+	var buf bytes.Buffer
+	args := []string{".", "./cmd/tool", "github.com/other/pkg"}
+	if err := runResolveFrom(&buf, root, root, args); err != nil {
+		t.Fatalf("runResolveFrom: %v", err)
 	}
-	writeFile(t, filepath.Join(subDir, "greet.go"), `// Package greet says hello.
-package greet
 
-// Hello returns a greeting.
-func Hello() string { return "hello" }
-`)
-
-	// -all is a valid go doc flag and should not cause an error.
-	if err := runDocFrom(root, root, []string{"-all", "./greet"}); err != nil {
-		t.Fatalf("runDocFrom with -all: %v", err)
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	wants := []string{
+		"example.com/testmod",
+		"example.com/testmod/cmd/tool",
+		"github.com/other/pkg",
+	}
+	if len(lines) != len(wants) {
+		t.Fatalf("runResolveFrom output lines = %d, want %d\ngot: %q", len(lines), len(wants), buf.String())
+	}
+	for i, want := range wants {
+		if lines[i] != want {
+			t.Errorf("line[%d] = %q, want %q", i, lines[i], want)
+		}
 	}
 }

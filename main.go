@@ -19,7 +19,7 @@ Commands:
   lint      Run go vet ./...
   build     Build packages (go install into .local/gobin, or go build -o)
   run       Build package and run the resulting binary (use -- to separate binary arguments)
-  doc       Show documentation via go doc (relative paths are resolved to module import paths)
+  resolve   Resolve relative package paths to full module import paths
 
 Run 'gopkg <command> -help' for per-command flags.
 `
@@ -52,8 +52,8 @@ func main() {
 		err = cmdBuild(args[1:])
 	case "run":
 		err = cmdRun(args[1:])
-	case "doc":
-		err = cmdDoc(args[1:])
+	case "resolve":
+		err = cmdResolve(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", args[0])
 		flag.Usage()
@@ -124,6 +124,6 @@ func cmdRun(args []string) error {
 	return runRun(*verbose, fs.Args(), runArgs)
 }
 
-func cmdDoc(args []string) error {
-	return runDoc(args)
+func cmdResolve(args []string) error {
+	return runResolve(args)
 }
