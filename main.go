@@ -18,6 +18,8 @@ Commands:
   format    Run go tool golang.org/x/tools/cmd/goimports -w ./... (and optionally go fix ./...)
   lint      Run go vet ./...
   build     Build packages (go install into .local/gobin, or go build -o)
+  run       Build package and run the resulting binary (use -- to separate binary arguments)
+  doc       Show documentation via go doc (relative paths are resolved to module import paths)
 
 Run 'gopkg <command> -help' for per-command flags.
 `
@@ -48,6 +50,10 @@ func main() {
 		err = cmdLint(args[1:])
 	case "build":
 		err = cmdBuild(args[1:])
+	case "run":
+		err = cmdRun(args[1:])
+	case "doc":
+		err = cmdDoc(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", args[0])
 		flag.Usage()
@@ -105,4 +111,19 @@ func cmdBuild(args []string) error {
 	verbose := fs.Bool("v", false, "pass -v to the underlying go build/install command")
 	fs.Parse(args) //nolint:errcheck // ExitOnError
 	return runBuild(*output, *verbose, fs.Args())
+}
+
+func cmdRun(args []string) error {
+	// Split at "--" before flag parsing so that runtime args are not consumed
+	// by the flag parser.
+	buildArgs, runArgs := splitAtDashDash(args)
+
+	fs := flag.NewFlagSet("run", flag.ExitOnError)
+	verbose := fs.Bool("v", false, "pass -v to the underlying go build command")
+	fs.Parse(buildArgs) //nolint:errcheck // ExitOnError
+	return runRun(*verbose, fs.Args(), runArgs)
+}
+
+func cmdDoc(args []string) error {
+	return runDoc(args)
 }
