@@ -16,6 +16,40 @@ When generating a new ADR, strictly follow this structure:
 - **Decision**: What is the exact decision?
 - **Consequences**: What becomes easier? What becomes harder?
 
+Required template:
+```md
+# ADR-XXX: <short title>
+
+- Date: YYYY-MM-DD
+- Status: Proposed / Accepted / Superseded by [ADR-XXX] / Deprecated
+
+## Context
+...
+
+## Decision
+...
+
+## Consequences
+...
+```
+The `Status` line above shows alternatives; each ADR must choose exactly one value from the enum.
+
+### Why these fields are mandatory
+- **Date** is required to keep decision chronology explicit.
+- **Status** is required so readers can safely know whether the ADR is active.
+- **Context** is required to preserve non-obvious constraints that tests cannot encode.
+- **Decision** is required to make the chosen rule explicit and reviewable.
+- **Consequences** is required to document trade-offs and future operational cost.
+
+### Status enum (closed set)
+Only these values are allowed for `Status`:
+- `Proposed`
+- `Accepted`
+- `Superseded by [ADR-XXX]`
+- `Deprecated`
+
+No other status strings are allowed. This keeps ADR lifecycle machine-checkable and consistent.
+
 ## 3. The Archgate Pattern (実行可能ルールへの結合)
 Architectural decisions are useless unless enforced deterministically. When you create an ADR, you MUST pair it with an executable check.
 

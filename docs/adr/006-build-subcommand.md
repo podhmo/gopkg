@@ -13,6 +13,13 @@ We standardize the following `build` behavior:
 - Auto-create `.local/gobin` under module root when needed.
 - Default package target is `.` when no packages are provided.
 - Pass through optional `-v` to underlying build/install command.
+- Fixed and non-customizable in this command:
+  - Default binary install directory is fixed to `<moduleRoot>/.local/gobin`.
+  - `GOBIN` derivation is fixed to the absolute path of that directory.
+  - Default package fallback is fixed to `.`.
+- Variable input:
+  - `-o` switches to explicit output mode.
+  - Package list and `-v` verbosity are caller-provided.
 
 ## Consequences
 - Easier: fast incremental local builds via Go cache and stable binary placement in `.local/gobin`.

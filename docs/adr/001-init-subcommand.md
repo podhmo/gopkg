@@ -12,6 +12,13 @@ We standardize the following `init` behavior:
 - If `go.mod` already exists, return success without making further changes (idempotent behavior).
 - If module path argument is omitted, infer from current directory only when the path contains `github.com/`; otherwise return an explicit error.
 - After `go mod init`, install `golang.org/x/tools/cmd/goimports` as a Go tool dependency.
+- Fixed and non-customizable in this command:
+  - CI workflow path is fixed at `.github/workflows/ci.yml`.
+  - Auto-installed formatter tool is fixed as `golang.org/x/tools/cmd/goimports`.
+  - Module inference rule is fixed to `github.com/`-based directory detection only.
+- Variable input:
+  - Explicit module path argument can be provided by caller.
+  - `--ci` toggles whether workflow file generation is executed.
 
 ## Consequences
 - Easier: new projects get a consistent bootstrap flow, including optional CI and formatter tool setup.

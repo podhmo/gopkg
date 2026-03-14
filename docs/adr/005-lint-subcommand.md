@@ -10,6 +10,11 @@
 We standardize the following `lint` behavior:
 - Always run `go vet ./...` from module root.
 - Provide no command-specific lint configuration flags.
+- Fixed and non-customizable in this command:
+  - Lint engine is fixed to `go vet`.
+  - Target scope is fixed to `./...`.
+- Variable input:
+  - None.
 
 ## Consequences
 - Easier: predictable lint behavior tightly aligned with standard Go tooling.

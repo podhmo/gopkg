@@ -14,6 +14,13 @@ We standardize the following `format` behavior:
 - Convert `./...`-style and module import-path patterns to directory roots accepted by `goimports`.
 - After `goimports`, run import-alias correction as best-effort; failures emit warning and do not fail the whole format step.
 - On goimports execution failure, print hint to add tool dependency via `go get -tool golang.org/x/tools/cmd/goimports@latest`.
+- Fixed and non-customizable in this command:
+  - Formatter is fixed to `goimports` (not `gofumpt` and not user-selectable).
+  - Import grouping is fixed to module-local grouping via `-local <moduleName>`.
+  - Post-format alias-fix pass is always attempted (best-effort warning on failure).
+- Variable input:
+  - `--fix` toggles pre-format `go fix`.
+  - Package patterns can narrow formatting scope.
 
 ## Consequences
 - Easier: consistent formatting, local import grouping, and automatic alias normalization.

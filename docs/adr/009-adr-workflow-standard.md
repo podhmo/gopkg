@@ -13,8 +13,11 @@ We adopt and document ADR workflow standards in:
 
 We require:
 - immutability of existing ADR content in `docs/adr/` with supersession process,
-- fixed ADR metadata/section structure,
+- fixed ADR metadata/section structure (Date, Status, Context, Decision, Consequences),
+- explicit status enum as a closed set (`Proposed`, `Accepted`, `Superseded by [ADR-XXX]`, `Deprecated`),
 - executable enforcement expectations (archgate pattern) for architectural rules.
+
+The workflow document explicitly states why each mandatory item exists so authors know what must be written and why.
 
 `AGENTS.md` is updated to route contributors to the workflow standard first and to prohibit ADR overwrite/invention of rules outside ADR documents.
 
