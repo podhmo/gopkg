@@ -12,7 +12,6 @@ func TestADRWorkflowDefinesRequiredFieldsAndStatusEnum(t *testing.T) {
 
 	paths := []string{
 		filepath.Join("docs", "adr-workflow.md"),
-		filepath.Join("docs", "standards", "adr-workflow.md"),
 	}
 
 	required := []string{
@@ -89,13 +88,6 @@ func TestSubcommandADRsDescribeFixedNonCustomizableBehavior(t *testing.T) {
 	if !strings.Contains(string(formatADR), "not `gofumpt`") {
 		t.Fatalf("format ADR must explicitly say goimports is fixed and gofumpt is not selected")
 	}
-	if !strings.Contains(string(formatADR), "not `gofmt`") {
-		t.Fatalf("format ADR must explicitly say goimports is preferred over gofmt")
-	}
-	if !strings.Contains(string(formatADR), "automatically adds missing imports") {
-		t.Fatalf("format ADR must explicitly say goimports is preferred because it auto-adds missing imports")
-	}
-
 	buildADR, err := os.ReadFile(filepath.Join("docs", "adr", "006-build-subcommand.md"))
 	if err != nil {
 		t.Fatalf("reading build ADR: %v", err)

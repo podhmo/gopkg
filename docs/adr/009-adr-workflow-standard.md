@@ -9,7 +9,6 @@ The repository needs deterministic governance for architectural decisions. Witho
 ## Decision
 We adopt and document ADR workflow standards in:
 - `docs/adr-workflow.md` (requested top-level ADR workflow document)
-- `docs/standards/adr-workflow.md` (routing target referenced by `AGENTS.md`)
 
 We require:
 - immutability of existing ADR content in `docs/adr/` with supersession process,

@@ -14,7 +14,7 @@
 - Run `go test ./...` and confirm every test passes before declaring completion.
 
 ## 📍 Pointers & Routing
-- **Architecture & Decisions**: Read `docs/standards/adr-workflow.md` FIRST. All architectural history is in `docs/adr/`.
+- **Architecture & Decisions**: Read `docs/adr-workflow.md` FIRST. All architectural history is in `docs/adr/`.
 
 ## 🚫 Strict Prohibitions (NEVER DO THESE)
 
