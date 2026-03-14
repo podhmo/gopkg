@@ -1,6 +1,6 @@
 # gopkg
 
-A selfish Go package manager – a thin wrapper around standard Go tooling that provides a convenient, npm-style developer experience.
+A selfish Go package manager – a thin wrapper around standard Go tooling that provides a convenient, npm-style （not really npm like）developer experience.
 
 ## Install
 
