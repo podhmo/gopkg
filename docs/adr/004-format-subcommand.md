@@ -15,7 +15,7 @@ We standardize the following `format` behavior:
 - After `goimports`, run import-alias correction as best-effort; failures emit warning and do not fail the whole format step.
 - On goimports execution failure, print hint to add tool dependency via `go get -tool golang.org/x/tools/cmd/goimports@latest`.
 - Fixed and non-customizable in this command:
-  - Formatter is fixed to `goimports` (not `gofumpt` and not user-selectable).
+  - Formatter is fixed to `goimports` (not `gofmt`, not `gofumpt`, and not user-selectable) because `goimports` automatically adds missing imports.
   - Import grouping is fixed to module-local grouping via `-local <moduleName>`.
   - Post-format alias-fix pass is always attempted (best-effort warning on failure).
 - Variable input:
