@@ -110,6 +110,15 @@ func runFormatFrom(root string, fix, verbose bool, pkgs []string) error {
 		return err
 	}
 
+	// Before running goimports, add explicit aliases to imports whose declared
+	// package name differs from the last non-version component of their path
+	// (e.g. package "bar" imported from "github.com/foo/go-bar").  This must
+	// happen first so that goimports can group the aliased imports correctly.
+	if err := runFixImportAliasesFrom(root, patterns); err != nil {
+		// Best-effort: alias fixing must not break the overall format step.
+		fmt.Fprintf(os.Stderr, "warning: fixing import aliases: %v\n", err)
+	}
+
 	args := []string{"tool", goimportsTool, "-local", moduleName, "-w"}
 	if verbose {
 		args = append(args, "-v")
@@ -118,14 +127,6 @@ func runFormatFrom(root string, fix, verbose bool, pkgs []string) error {
 	if err := run(root, "go", args...); err != nil {
 		fmt.Fprintf(os.Stderr, "\nhint: to use gopkg format, add goimports as a tool dependency:\n  go get -tool %s@latest\n", goimportsTool)
 		return err
-	}
-
-	// After goimports succeeds, add explicit aliases to imports whose declared
-	// package name differs from the last non-version component of their path
-	// (e.g. package "bar" imported from "github.com/foo/go-bar").
-	if err := runFixImportAliasesFrom(root, patterns); err != nil {
-		// Best-effort: alias fixing must not break the overall format step.
-		fmt.Fprintf(os.Stderr, "warning: fixing import aliases: %v\n", err)
 	}
 	return nil
 }
